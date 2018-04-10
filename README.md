@@ -2,9 +2,6 @@
 
 _A bot that authenticates users and get profile information and the latest email for the logged in user_.
 
-[Checkout out the bot on Skype](https://join.skype.com/bot/dce91571-f312-4395-8602-91a145d1f52a)
-![Auth Bot Demo in Skype](botdemoskype.gif)
-
 [Check out the demo site](https://authbot.azurewebsites.net/)
 
 This bot enables users to authenticate with their Microsoft id and/or their AD domain. Then the bot uses the accesstoken to retrieve the latest email for the user.
@@ -44,7 +41,6 @@ Setup the bot:
 
 ## Acknowledgement
 Many thanks to [@sozercan](https://github.com/sozercan) and [@GeekTrainer](https://github.com/GeekTrainer) for your contribution.
-
 
 ## License
 Licensed using the MIT License (MIT); Copyright (c) Microsoft Corporation. For more information, please see [LICENSE](LICENSE).

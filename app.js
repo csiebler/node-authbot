@@ -1,7 +1,5 @@
 'use strict';
 
-const envx = require("envx");
-
 const restify = require('restify');
 const builder = require('botbuilder');
 const passport = require('passport');
@@ -12,34 +10,39 @@ const querystring = require('querystring');
 const https = require('https');
 const request = require('request');
 
+require('dotenv').config();
+
+const HttpsServer = require('./HttpsServer');
+
 //bot application identity
-const MICROSOFT_APP_ID = envx("MICROSOFT_APP_ID");
-const MICROSOFT_APP_PASSWORD = envx("MICROSOFT_APP_PASSWORD");
+const MICROSOFT_APP_ID = process.env.MICROSOFT_APP_ID;
+const MICROSOFT_APP_PASSWORD = process.env.MICROSOFT_APP_PASSWORD;
 
 //oauth details
-const AZUREAD_APP_ID = envx("AZUREAD_APP_ID");
-const AZUREAD_APP_PASSWORD = envx("AZUREAD_APP_PASSWORD");
-const AZUREAD_APP_REALM = envx("AZUREAD_APP_REALM");
-const AUTHBOT_CALLBACKHOST = envx("AUTHBOT_CALLBACKHOST");
-const AUTHBOT_STRATEGY = envx("AUTHBOT_STRATEGY");
+const AZUREAD_APP_ID = process.env.AZUREAD_APP_ID;
+const AZUREAD_APP_PASSWORD = process.env.AZUREAD_APP_PASSWORD;
+const AZUREAD_APP_REALM = process.env.AZUREAD_APP_REALM;
+const AUTHBOT_CALLBACKHOST = process.env.AUTHBOT_CALLBACKHOST;
+
+const USE_EMULATOR = (process.env.USE_EMULATOR == 'development');
 
 //=========================================================
 // Bot Setup
 //=========================================================
 
 // Setup Restify Server
-var server = restify.createServer();
-server.listen(process.env.port || process.env.PORT || 3979, function () {
-  console.log('%s listening to %s', server.name, server.url); 
-});
+
+var server = new HttpsServer();
   
 // Create chat bot
 console.log('started...')
 console.log(MICROSOFT_APP_ID);
-var connector = new builder.ChatConnector({
+
+var connector = USE_EMULATOR ? new builder.ChatConnector() : new azure.BotServiceConnector({
   appId: MICROSOFT_APP_ID,
   appPassword: MICROSOFT_APP_PASSWORD
 });
+
 var bot = new builder.UniversalBot(connector);
 server.post('/api/messages', connector.listen());
 server.get('/', restify.serveStatic({
@@ -117,32 +120,7 @@ let oidStrategyv2 = {
   passReqToCallback: true
 };
 
-// Use the v1 endpoint (applications configured by manage.windowsazure.com)
-// This works against Azure AD
-let oidStrategyv1 = {
-  redirectUrl: AUTHBOT_CALLBACKHOST +'/api/OAuthCallback',
-  realm: realm,
-  clientID: AZUREAD_APP_ID,
-  clientSecret: AZUREAD_APP_PASSWORD,
-  validateIssuer: false,
-  //allowHttpForRedirectUrl: true,
-  oidcIssuer: undefined,
-  identityMetadata: 'https://login.microsoftonline.com/' + realm + '/.well-known/openid-configuration',
-  skipUserProfile: true,
-  responseType: 'code',
-  responseMode: 'query',
-  passReqToCallback: true
-};
-
-let strategy = null;
-if ( AUTHBOT_STRATEGY == 'oidStrategyv1') {
-  strategy = oidStrategyv1;
-}
-if ( AUTHBOT_STRATEGY == 'oidStrategyv2') {
-  strategy = oidStrategyv2;
-}
-
-passport.use(new OIDCStrategy(strategy,
+passport.use(new OIDCStrategy(oidStrategyv2,
   (req, iss, sub, profile, accessToken, refreshToken, done) => {
     if (!profile.displayName) {
       return done(new Error("No oid found"), null);
@@ -358,7 +336,7 @@ function getAccessTokenWithRefreshToken(refreshToken, callback){
 
 function getUserLatestEmail(accessToken, callback) {
   var options = {
-    host: 'outlook.office.com', //https://outlook.office.com/api/v2.0/me/messages
+    host: 'outlook.office.com',
     path: '/api/v2.0/me/MailFolders/Inbox/messages?$top=1',
     method: 'GET',
     headers: {
