@@ -45,6 +45,8 @@ exports.getAccessTokenWithRefreshToken = function (refreshToken, callback) {
   });
 };
 
+
+
 exports.getStrategy = function () {
   // Use the v2 endpoint (applications configured by apps.dev.microsoft.com)
   // For passport-azure-ad v2.0.0, had to set realm = 'common' to ensure authbot works on azure app service
@@ -65,3 +67,4 @@ exports.getStrategy = function () {
   };
   return oidStrategyv2;
 };
+

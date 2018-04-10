@@ -40,4 +40,5 @@ exports.getUserLatestEmail = function (accessToken, callback) {
   }).on('error', function (e) {
     callback(e, null);
   });
-}
+};
+

@@ -8,7 +8,6 @@ const passport = require('passport');
 const OIDCStrategy = require('passport-azure-ad').OIDCStrategy;
 const expressSession = require('express-session');
 const crypto = require('crypto');
-const querystring = require('querystring');
 const request = require('request');
 
 require('dotenv').config();
@@ -16,6 +15,7 @@ require('dotenv').config();
 const HttpsServer = require('./HttpsServer');
 const AuthHelper = require('./AuthHelper');
 const OfficeHelper = require('./OfficeHelper');
+const DialogHelper = require('./DialogHelper');
 
 const STORAGE_CONNECTION_STRING = process.env.STORAGE_CONNECTION_STRING;
 const STATE_TABLE = process.env.STATE_TABLE;
@@ -133,30 +133,6 @@ passport.use(new OIDCStrategy(oidStrategyv2,
 // Bots Dialogs
 //=========================================================
 
-function login(session) {
-  // Generate signin link
-  const address = session.message.address;
-
-  // TODO: Encrypt the address string
-  const link = AUTHBOT_CALLBACKHOST + '/login?address=' + querystring.escape(JSON.stringify(address));
-
-  var msg = new builder.Message(session)
-    .attachments([
-      new builder.SigninCard(session)
-        .text("Please click this link to sign in first.")
-        .button("signin", link)
-    ]);
-  session.send(msg);
-  builder.Prompts.text(session, "You must first sign into your account.");
-}
-
-bot.dialog('signin', [
-  (session, results) => {
-    console.log('signin callback: ' + results);
-    session.endDialog();
-  }
-]);
-
 bot.dialog('/', [
   (session, args, next) => {
     if (!(session.userData.userName && session.userData.accessToken && session.userData.refreshToken)) {
@@ -169,7 +145,7 @@ bot.dialog('/', [
   (session, results, next) => {
     if (session.userData.userName && session.userData.accessToken && session.userData.refreshToken) {
       // They're logged in
-      builder.Prompts.text(session, "Welcome " + session.userData.userName + "! You are currently logged in. To get the latest email, type 'email'. To quit, type 'quit'. To log out, type 'logout'. ");
+      builder.Prompts.text(session, `Welcome ${session.userData.userName}! You are currently logged in. To get the latest email, type 'email'. To quit, type 'quit'. To log out, type 'logout'.`);
     } else {
       session.endConversation("Goodbye.");
     }
@@ -177,7 +153,7 @@ bot.dialog('/', [
   (session, results, next) => {
     var resp = results.response;
     if (resp === 'email') {
-      session.beginDialog('workPrompt');
+      session.beginDialog('email');
     } else if (resp === 'quit') {
       session.endConversation("Goodbye.");
     } else if (resp === 'logout') {
@@ -195,105 +171,6 @@ bot.dialog('/', [
   }
 ]);
 
-bot.dialog('workPrompt', [
-  (session) => {
-    OfficeHelper.getUserLatestEmail(session.userData.accessToken,
-      function (requestError, result) {
-        if (result && result.value && result.value.length > 0) {
-          const responseMessage = 'Your latest email is: "' + result.value[0].Subject + '"';
-          session.send(responseMessage);
-          builder.Prompts.confirm(session, "Retrieve the latest email again?");
-        } else {
-          console.log('no user returned');
-          if (requestError) {
-            console.log('requestError');
-            console.error(requestError);
-            // Get a new valid access token with refresh token
-            AuthHelper.getAccessTokenWithRefreshToken(session.userData.refreshToken, (err, body, res) => {
-
-              if (err || body.error) {
-                console.log(err);
-                session.send("Error while getting a new access token. Please try logout and login again. Error: " + err);
-                session.endDialog();
-              } else {
-                session.userData.accessToken = body.accessToken;
-                OfficeHelper.getUserLatestEmail(session.userData.accessToken,
-                  function (requestError, result) {
-                    if (result && result.value && result.value.length > 0) {
-                      const responseMessage = 'Your latest email is: "' + result.value[0].Subject + '"';
-                      session.send(responseMessage);
-                      builder.Prompts.confirm(session, "Retrieve the latest email again?");
-                    }
-                  }
-                );
-              }
-
-            });
-          }
-        }
-      }
-    );
-  },
-  (session, results) => {
-    var prompt = results.response;
-    if (prompt) {
-      session.replaceDialog('workPrompt');
-    } else {
-      session.endDialog();
-    }
-  }
-]);
-
-bot.dialog('signinPrompt', [
-  (session, args) => {
-    if (args && args.invalid) {
-      // Re-prompt the user to click the link
-      builder.Prompts.text(session, "please click the signin link.");
-    } else {
-      login(session);
-    }
-  },
-  (session, results) => {
-    //resuming
-    session.userData.loginData = JSON.parse(results.response);
-    if (session.userData.loginData && session.userData.loginData.magicCode && session.userData.loginData.accessToken) {
-      session.beginDialog('validateCode');
-    } else {
-      session.replaceDialog('signinPrompt', { invalid: true });
-    }
-  },
-  (session, results) => {
-    if (results.response) {
-      //code validated
-      session.userData.userName = session.userData.loginData.name;
-      session.endDialogWithResult({ response: true });
-    } else {
-      session.endDialogWithResult({ response: false });
-    }
-  }
-]);
-
-bot.dialog('validateCode', [
-  (session) => {
-    builder.Prompts.text(session, "Please enter the code you received or type 'quit' to end. ");
-  },
-  (session, results) => {
-    const code = results.response;
-    if (code === 'quit') {
-      session.endDialogWithResult({ response: false });
-    } else {
-      if (code === session.userData.loginData.magicCode) {
-        // Authenticated, save
-        session.userData.accessToken = session.userData.loginData.accessToken;
-        session.userData.refreshToken = session.userData.loginData.refreshToken;
-
-        session.endDialogWithResult({ response: true });
-      } else {
-        session.send("hmm... Looks like that was an invalid code. Please try again.");
-        session.replaceDialog('validateCode');
-      }
-    }
-  }
-]);
-
-
+bot.dialog('email', DialogHelper.emailDialog);
+bot.dialog('signinPrompt', DialogHelper.signInDialog);
+bot.dialog('validateCode', DialogHelper.validateCodeDialog);
