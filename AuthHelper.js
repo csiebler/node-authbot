@@ -1,5 +1,17 @@
 'use strict';
 
+require('dotenv').config();
+
+//bot application identity
+const MICROSOFT_APP_ID = process.env.MICROSOFT_APP_ID;
+const MICROSOFT_APP_PASSWORD = process.env.MICROSOFT_APP_PASSWORD;
+
+//oauth details
+const AZUREAD_APP_ID = process.env.AZUREAD_APP_ID;
+const AZUREAD_APP_PASSWORD = process.env.AZUREAD_APP_PASSWORD;
+const AZUREAD_APP_REALM = process.env.AZUREAD_APP_REALM;
+const AUTHBOT_CALLBACKHOST = process.env.AUTHBOT_CALLBACKHOST;
+
 exports.getAccessTokenWithRefreshToken = function (refreshToken, callback) {
   console.log("getAccessTokenWithRefreshToken");
   var data = 'grant_type=refresh_token'
@@ -31,4 +43,25 @@ exports.getAccessTokenWithRefreshToken = function (refreshToken, callback) {
       refreshToken: body.refresh_token
     }, res);
   });
-}
+};
+
+exports.getStrategy = function () {
+  // Use the v2 endpoint (applications configured by apps.dev.microsoft.com)
+  // For passport-azure-ad v2.0.0, had to set realm = 'common' to ensure authbot works on azure app service
+  var realm = AZUREAD_APP_REALM;
+  let oidStrategyv2 = {
+    redirectUrl: AUTHBOT_CALLBACKHOST + '/api/OAuthCallback',
+    realm: AZUREAD_APP_REALM,
+    clientID: AZUREAD_APP_ID,
+    clientSecret: AZUREAD_APP_PASSWORD,
+    identityMetadata: 'https://login.microsoftonline.com/' + AZUREAD_APP_REALM + '/v2.0/.well-known/openid-configuration',
+    skipUserProfile: false,
+    validateIssuer: false,
+    //allowHttpForRedirectUrl: true,
+    responseType: 'code',
+    responseMode: 'query',
+    scope: ['email', 'profile', 'offline_access', 'https://outlook.office.com/mail.read'],
+    passReqToCallback: true
+  };
+  return oidStrategyv2;
+};

@@ -2,6 +2,8 @@
 
 const restify = require('restify');
 const builder = require('botbuilder');
+const azure = require("botbuilder-azure");
+
 const passport = require('passport');
 const OIDCStrategy = require('passport-azure-ad').OIDCStrategy;
 const expressSession = require('express-session');
@@ -14,6 +16,9 @@ require('dotenv').config();
 const HttpsServer = require('./HttpsServer');
 const AuthHelper = require('./AuthHelper');
 const OfficeHelper = require('./OfficeHelper');
+
+const STORAGE_CONNECTION_STRING = process.env.STORAGE_CONNECTION_STRING;
+const STATE_TABLE = process.env.STATE_TABLE;
 
 //bot application identity
 const MICROSOFT_APP_ID = process.env.MICROSOFT_APP_ID;
@@ -31,12 +36,14 @@ const USE_EMULATOR = (process.env.USE_EMULATOR == 'development');
 // Bot Setup
 //=========================================================
 
-// Setup Restify Server
-
+// Setup Https Server
 var server = new HttpsServer();
 
 // Create chat bot
 console.log(`Starting with AppId ${MICROSOFT_APP_ID}`)
+
+let azureTableClient = new azure.AzureTableClient(STATE_TABLE, STORAGE_CONNECTION_STRING);
+let tableStorage = new azure.AzureBotStorage({ gzipData: false }, azureTableClient);
 
 var connector = USE_EMULATOR ? new builder.ChatConnector() : new azure.BotServiceConnector({
   appId: MICROSOFT_APP_ID,
@@ -44,6 +51,9 @@ var connector = USE_EMULATOR ? new builder.ChatConnector() : new azure.BotServic
 });
 
 var bot = new builder.UniversalBot(connector);
+bot.set('storage', tableStorage);
+
+
 server.post('/api/messages', connector.listen());
 server.get('/', restify.serveStatic({
   'directory': __dirname,
@@ -103,23 +113,7 @@ passport.deserializeUser(function (id, done) {
   done(null, id);
 });
 
-// Use the v2 endpoint (applications configured by apps.dev.microsoft.com)
-// For passport-azure-ad v2.0.0, had to set realm = 'common' to ensure authbot works on azure app service
-var realm = AZUREAD_APP_REALM;
-let oidStrategyv2 = {
-  redirectUrl: AUTHBOT_CALLBACKHOST + '/api/OAuthCallback',
-  realm: realm,
-  clientID: AZUREAD_APP_ID,
-  clientSecret: AZUREAD_APP_PASSWORD,
-  identityMetadata: 'https://login.microsoftonline.com/' + realm + '/v2.0/.well-known/openid-configuration',
-  skipUserProfile: false,
-  validateIssuer: false,
-  //allowHttpForRedirectUrl: true,
-  responseType: 'code',
-  responseMode: 'query',
-  scope: ['email', 'profile', 'offline_access', 'https://outlook.office.com/mail.read'],
-  passReqToCallback: true
-};
+let oidStrategyv2 = AuthHelper.getStrategy();
 
 passport.use(new OIDCStrategy(oidStrategyv2,
   (req, iss, sub, profile, accessToken, refreshToken, done) => {
@@ -138,13 +132,13 @@ passport.use(new OIDCStrategy(oidStrategyv2,
 //=========================================================
 // Bots Dialogs
 //=========================================================
+
 function login(session) {
   // Generate signin link
   const address = session.message.address;
 
   // TODO: Encrypt the address string
   const link = AUTHBOT_CALLBACKHOST + '/login?address=' + querystring.escape(JSON.stringify(address));
-
 
   var msg = new builder.Message(session)
     .attachments([
