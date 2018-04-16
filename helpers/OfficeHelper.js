@@ -1,7 +1,5 @@
 'use strict';
-
 const https = require('https');
-
 
 exports.getUserLatestEmail = function (accessToken, callback) {
 

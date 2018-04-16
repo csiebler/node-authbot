@@ -2,6 +2,7 @@
 const querystring = require('querystring');
 const builder = require('botbuilder');
 const OfficeHelper = require('./OfficeHelper');
+const AuthHelper = require('./AuthHelper');
 
 //bot application identity
 const MICROSOFT_APP_ID = process.env.MICROSOFT_APP_ID;

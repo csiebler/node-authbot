@@ -1,21 +1,17 @@
 'use strict';
-
 const restify = require('restify');
 const builder = require('botbuilder');
 const azure = require("botbuilder-azure");
-
 const passport = require('passport');
 const OIDCStrategy = require('passport-azure-ad').OIDCStrategy;
-const expressSession = require('express-session');
 const crypto = require('crypto');
-const request = require('request');
+
+const HttpsServer = require('./helpers/HttpsServer');
+const AuthHelper = require('./helpers/AuthHelper');
+const OfficeHelper = require('./helpers/OfficeHelper');
+const DialogHelper = require('./helpers/DialogHelper');
 
 require('dotenv').config();
-
-const HttpsServer = require('./HttpsServer');
-const AuthHelper = require('./AuthHelper');
-const OfficeHelper = require('./OfficeHelper');
-const DialogHelper = require('./DialogHelper');
 
 const STORAGE_CONNECTION_STRING = process.env.STORAGE_CONNECTION_STRING;
 const STATE_TABLE = process.env.STATE_TABLE;
@@ -23,12 +19,6 @@ const STATE_TABLE = process.env.STATE_TABLE;
 //bot application identity
 const MICROSOFT_APP_ID = process.env.MICROSOFT_APP_ID;
 const MICROSOFT_APP_PASSWORD = process.env.MICROSOFT_APP_PASSWORD;
-
-//oauth details
-const AZUREAD_APP_ID = process.env.AZUREAD_APP_ID;
-const AZUREAD_APP_PASSWORD = process.env.AZUREAD_APP_PASSWORD;
-const AZUREAD_APP_REALM = process.env.AZUREAD_APP_REALM;
-const AUTHBOT_CALLBACKHOST = process.env.AUTHBOT_CALLBACKHOST;
 
 const USE_EMULATOR = (process.env.USE_EMULATOR == 'development');
 
@@ -40,7 +30,7 @@ const USE_EMULATOR = (process.env.USE_EMULATOR == 'development');
 var server = new HttpsServer();
 
 // Create chat bot
-console.log(`Starting with AppId ${MICROSOFT_APP_ID}`)
+console.log(`Starting with AppId=${MICROSOFT_APP_ID}`)
 
 let azureTableClient = new azure.AzureTableClient(STATE_TABLE, STORAGE_CONNECTION_STRING);
 let tableStorage = new azure.AzureBotStorage({ gzipData: false }, azureTableClient);
@@ -53,20 +43,12 @@ var connector = USE_EMULATOR ? new builder.ChatConnector() : new azure.BotServic
 var bot = new builder.UniversalBot(connector);
 bot.set('storage', tableStorage);
 
-
 server.post('/api/messages', connector.listen());
-server.get('/', restify.serveStatic({
-  'directory': __dirname,
-  'default': 'index.html'
-}));
 
 //=========================================================
 // Auth Setup
 //=========================================================
 
-server.use(restify.queryParser());
-server.use(restify.bodyParser());
-server.use(expressSession({ secret: 'keyboard cat', resave: true, saveUninitialized: false }));
 server.use(passport.initialize());
 
 server.get('/login', function (req, res, next) {
@@ -102,7 +84,7 @@ server.get('/api/OAuthCallback/',
     console.log(continueMsg.toMessage());
 
     bot.receive(continueMsg.toMessage());
-    res.send('Welcome ' + req.user.displayName + '! Please copy this number and paste it back to your chat so your authentication can complete: ' + magicCode);
+    res.send(`Welcome ${req.user.displayName}! Please copy this number and paste it back to your chat so your authentication can complete ${magicCode}`);
   });
 
 passport.serializeUser(function (user, done) {
