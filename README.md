@@ -25,7 +25,7 @@ npm install
 If you haven't done it yet, register your bot through the [Apps Dev Portal](https://apps.dev.microsoft.com) (make sure you're signing in with the correct Azure Active Directory user):
 
 1. Open [Apps Dev Portal](https://apps.dev.microsoft.com) and click `Add an app` (the portal is used for V2 Azure Active Directory endpoints)
-1. Give your app it a name
+1. Give your app a name
 1. Click on the new app and note the Application Id (this is your `AZUREAD_APP_ID`)
 1. Click `Generate New Password` under `Application Secrets` and save it somewhere (this is your `AZUREAD_APP_PASSWORD`)
 1. Under `Platforms`, click `Add Platform` and choose `Web`
