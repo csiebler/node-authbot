@@ -84,7 +84,16 @@ server.get('/api/OAuthCallback/',
     console.log(continueMsg.toMessage());
 
     bot.receive(continueMsg.toMessage());
-    res.send(`Welcome ${req.user.displayName}! Please copy this number and paste it back to your chat so your authentication can complete ${magicCode}`);
+    //res.send(`Welcome ${req.user.displayName}! Please copy this number and paste it back to your chat so your authentication can complete ${magicCode}`);
+
+    var body = `<html><body>Welcome ${req.user.displayName}! Please copy this number and paste it back to your chat so your authentication can complete: ${magicCode}</body></html>`;
+    res.writeHead(200, {
+      'Content-Length': Buffer.byteLength(body),
+      'Content-Type': 'text/html'
+    });
+    res.write(body);
+    res.end();
+
   });
 
 passport.serializeUser(function (user, done) {
